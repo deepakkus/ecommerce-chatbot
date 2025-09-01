@@ -6,17 +6,19 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY as string);
 
 let db: mysql.Pool | null = null;
 
+
+
 async function getDB() {
   if (!db) {
     db = mysql.createPool({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASS,
-      database: process.env.DB_NAME,
-    });
+      uri: process.env.DATABASE_URL as string, // ✅ works for Vercel MySQL
+      waitForConnections: true,
+      connectionLimit: 10,
+    } as any); // cast because `uri` isn’t in types, but works
   }
   return db;
 }
+
 
 // Define expected row types
 interface FAQRow extends RowDataPacket {
