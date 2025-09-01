@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -7,6 +7,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   async function sendMessage() {
     if (!input.trim()) return;
@@ -26,7 +27,7 @@ export default function ChatPage() {
 
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: data.answer }, // ✅ safe access
+        { role: "assistant", text: data.answer || "⚠️ No response received." },
       ]);
     } catch (err) {
       setMessages((prev) => [
@@ -38,13 +39,18 @@ export default function ChatPage() {
     }
   }
 
+  // 🔽 Auto-scroll on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
   return (
-    <div className="flex justify-center items-center h-screen bg-gradient-to-b from-gray-100 to-white">
-      {/* Chat Container */}
-      <div className="flex flex-col h-[90vh] w-full max-w-[480px] bg-white border rounded-2xl shadow-lg overflow-hidden">
+    <div className="flex flex-col items-center h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Chat container */}
+      <div className="flex flex-col w-full max-w-2xl h-full border-x bg-white shadow-sm">
         {/* Header */}
-        <header className="p-4 bg-blue-600 text-white text-lg font-bold shadow-md">
-          🛒 Ecommerce Chatbot
+        <header className="p-4 bg-blue-600 text-white text-lg font-bold shadow-md rounded-b-lg">
+          🛒 Ecommerce Assistant
         </header>
 
         {/* Chat Messages */}
@@ -54,31 +60,45 @@ export default function ChatPage() {
               key={i}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`max-w-[260px] px-4 py-3 rounded-2xl shadow-md ${
+              className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm ${
                 msg.role === "user"
-                  ? "bg-blue-500 text-white self-end ml-auto"
-                  : "bg-gray-200 text-gray-800 self-start"
+                  ? "bg-blue-600 text-white self-end ml-auto"
+                  : "bg-gray-100 text-gray-800 self-start"
               }`}
             >
               {msg.text}
             </motion.div>
           ))}
 
+          {/* Typing indicator with bouncing dots */}
           {loading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-gray-200 text-gray-600 px-4 py-2 rounded-2xl shadow self-start w-fit max-w-[200px]"
-            >
-              Typing...
-            </motion.div>
+            <div className="bg-gray-100 text-gray-500 px-4 py-2 rounded-2xl shadow-sm self-start w-fit flex gap-1">
+              <motion.span
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                className="w-2 h-2 bg-gray-500 rounded-full"
+              />
+              <motion.span
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+                className="w-2 h-2 bg-gray-500 rounded-full"
+              />
+              <motion.span
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+                className="w-2 h-2 bg-gray-500 rounded-full"
+              />
+            </div>
           )}
+
+          {/* Auto-scroll anchor */}
+          <div ref={chatEndRef} />
         </div>
 
         {/* Input Box */}
-        <div className="p-4 bg-gray-50 border-t flex gap-2">
+        <div className="p-4 bg-white border-t flex gap-2 sticky bottom-0">
           <input
-            className="flex-1 border rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border rounded-full px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Type your message…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -87,9 +107,9 @@ export default function ChatPage() {
           <button
             onClick={sendMessage}
             disabled={loading}
-            className="bg-blue-600 text-white px-4 rounded-xl shadow hover:bg-blue-700 disabled:opacity-50"
+            className="bg-blue-600 text-white p-3 rounded-full shadow hover:bg-blue-700 disabled:opacity-50"
           >
-            <Send size={20} />
+            <Send size={18} />
           </button>
         </div>
       </div>
