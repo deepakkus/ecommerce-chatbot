@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import mysql from "mysql2/promise";
+import mysql, { RowDataPacket } from "mysql2/promise";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY as string);
 
@@ -18,6 +18,23 @@ async function getDB() {
   return db;
 }
 
+// Define expected row types
+interface FAQRow extends RowDataPacket {
+  answer: string;
+  relevance: number;
+}
+
+interface OrderRow extends RowDataPacket {
+  id: number;
+  status: string;
+  total: number;
+}
+
+interface ProductRow extends RowDataPacket {
+  name: string;
+  price: number;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { query, userId } = await req.json();
@@ -29,7 +46,7 @@ export async function POST(req: NextRequest) {
     let context = "";
 
     // 1️⃣ First check FAQs using FULLTEXT search
-    const [faqRows] = await db.query(
+    const [faqRows] = await db.query<FAQRow[]>(
       `SELECT answer, 
               MATCH(question) AGAINST (? IN NATURAL LANGUAGE MODE) AS relevance 
        FROM faqs 
@@ -39,17 +56,17 @@ export async function POST(req: NextRequest) {
       [query, query]
     );
 
-    if ((faqRows as any[]).length > 0) {
-      context = `FAQ Answer: ${(faqRows as any[])[0].answer}`;
+    if (faqRows.length > 0) {
+      context = `FAQ Answer: ${faqRows[0].answer}`;
     } 
     // 2️⃣ If no FAQ match, check order intent
     else if (/order/i.test(query)) {
-      const [rows] = await db.query(
+      const [rows] = await db.query<OrderRow[]>(
         "SELECT id, status, total FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
         [userId]
       );
-      if ((rows as any[]).length > 0) {
-        const order = (rows as any[])[0];
+      if (rows.length > 0) {
+        const order = rows[0];
         context = `The user's latest order is #${order.id}, status: "${order.status}", total: $${order.total}.`;
       } else {
         context = "The user has no recent orders.";
@@ -57,10 +74,10 @@ export async function POST(req: NextRequest) {
     } 
     // 3️⃣ Product intent
     else if (/product|shoe|bag|tshirt/i.test(query)) {
-      const [rows] = await db.query(
+      const [rows] = await db.query<ProductRow[]>(
         "SELECT name, price FROM products ORDER BY created_at DESC LIMIT 5"
       );
-      const products = (rows as any[]).map(p => `${p.name} - $${p.price}`).join("\n");
+      const products = rows.map(p => `${p.name} - $${p.price}`).join("\n");
       context = `Latest products:\n${products}`;
     } 
     // 4️⃣ General fallback
