@@ -6,15 +6,12 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY as string);
 
 let db: mysql.Pool | null = null;
 
-
-
 async function getDB() {
   if (!db) {
     db = mysql.createPool(process.env.DATABASE_URL!); // ✅ DSN string supported
   }
   return db;
 }
-
 
 // Define expected row types
 interface FAQRow extends RowDataPacket {
@@ -37,13 +34,16 @@ export async function POST(req: NextRequest) {
   try {
     const { query, userId } = await req.json();
     if (!query) {
-      return NextResponse.json({ error: "Query required" }, { status: 400 });
+      return NextResponse.json(
+        { answer: "⚠️ Query is required.", context: "" },
+        { status: 400 }
+      );
     }
 
     const db = await getDB();
     let context = "";
 
-    // 1️⃣ First check FAQs using FULLTEXT search
+    // 1️⃣ Check FAQs
     const [faqRows] = await db.query<FAQRow[]>(
       `SELECT answer, 
               MATCH(question) AGAINST (? IN NATURAL LANGUAGE MODE) AS relevance 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     if (faqRows.length > 0) {
       context = `FAQ Answer: ${faqRows[0].answer}`;
     } 
-    // 2️⃣ If no FAQ match, check order intent
+    // 2️⃣ Orders
     else if (/order/i.test(query)) {
       const [rows] = await db.query<OrderRow[]>(
         "SELECT id, status, total FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
@@ -70,34 +70,44 @@ export async function POST(req: NextRequest) {
         context = "The user has no recent orders.";
       }
     } 
-    // 3️⃣ Product intent
+    // 3️⃣ Products
     else if (/product|shoe|bag|tshirt/i.test(query)) {
       const [rows] = await db.query<ProductRow[]>(
         "SELECT name, price FROM products ORDER BY created_at DESC LIMIT 5"
       );
       const products = rows.map(p => `${p.name} - $${p.price}`).join("\n");
-      context = `Latest products:\n${products}`;
+      context = rows.length > 0 
+        ? `Latest products:\n${products}` 
+        : "No products available right now.";
     } 
-    // 4️⃣ General fallback
+    // 4️⃣ Default
     else {
       context = "General ecommerce info: shipping takes 3-5 days, returns within 7 days.";
     }
 
     // 🔹 Generate response with Gemini
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `
+    let answer = "";
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = `
 User asked: "${query}"
 Context from database: ${context}
 
 Answer the user in a friendly ecommerce support style.
 `;
-
-    const response = await model.generateContent(prompt);
-    const answer = response.response.text().trim();
+      const response = await model.generateContent(prompt);
+      answer = response.response.text().trim();
+    } catch (aiErr) {
+      console.error("Gemini error:", aiErr);
+      answer = "❌ Sorry, I couldn’t generate an answer right now. Please try again later.";
+    }
 
     return NextResponse.json({ answer, context });
   } catch (err) {
     console.error("Chat API Error:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({
+      answer: "❌ Internal Server Error. Please try again later.",
+      context: "",
+    });
   }
 }
