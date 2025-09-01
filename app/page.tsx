@@ -6,40 +6,53 @@ import { motion } from "framer-motion";
 export default function ChatPage() {
   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function sendMessage() {
     if (!input.trim()) return;
+
     const userMessage = { role: "user", text: input };
-    setMessages([...messages, userMessage]);
-
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setLoading(true);
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: input, userId: 1 }),
-    });
-    const data = await res.json();
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: input, userId: 1 }),
+      });
+      const data = await res.json();
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "assistant", text: data.data.answer },
-    ]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: data.answer }, // ✅ fixed here
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "⚠️ Error: Could not get response." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-100 to-white">
-      <header className="p-4 bg-blue-600 text-white text-lg font-semibold shadow-md">
-        💬 Ecommerce Chatbot
+      {/* Header */}
+      <header className="p-4 bg-blue-600 text-white text-lg font-bold shadow-md">
+        🛒 Ecommerce Chatbot
       </header>
 
+      {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`max-w-xs p-3 rounded-2xl shadow ${
+            className={`max-w-xs px-4 py-3 rounded-2xl shadow-md ${
               msg.role === "user"
                 ? "bg-blue-500 text-white self-end ml-auto"
                 : "bg-gray-200 text-gray-800 self-start"
@@ -48,8 +61,19 @@ export default function ChatPage() {
             {msg.text}
           </motion.div>
         ))}
+
+        {loading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-gray-200 text-gray-600 px-4 py-2 rounded-2xl shadow self-start w-fit"
+          >
+            Typing...
+          </motion.div>
+        )}
       </div>
 
+      {/* Input Box */}
       <div className="p-4 bg-white border-t flex gap-2">
         <input
           className="flex-1 border rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -60,7 +84,8 @@ export default function ChatPage() {
         />
         <button
           onClick={sendMessage}
-          className="bg-blue-600 text-white px-4 rounded-xl shadow hover:bg-blue-700"
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 rounded-xl shadow hover:bg-blue-700 disabled:opacity-50"
         >
           <Send size={20} />
         </button>

@@ -105,9 +105,12 @@ Answer the user in a friendly ecommerce support style.
     return NextResponse.json({ answer, context });
   } catch (err) {
     console.error("Chat API Error:", err);
-    return NextResponse.json({
-      answer: "❌ Internal Server Error. Please try again later.",
-      context: "",
-    });
+    return NextResponse.json(
+      {
+        answer: "❌ Internal Server Error. Please try again later.",
+        context: "",
+      },
+      { status: 500 }
+    );
   }
 }
