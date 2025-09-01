@@ -1,90 +1,68 @@
 "use client";
-import { useState, KeyboardEvent } from "react";
-
-type Message = {
-  role: "user" | "bot";
-  text: string;
-};
+import { useState } from "react";
+import { Send } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
   const [input, setInput] = useState("");
 
-  async function sendMessage(): Promise<void> {
+  async function sendMessage() {
     if (!input.trim()) return;
+    const userMessage = { role: "user", text: input };
+    setMessages([...messages, userMessage]);
 
-    const newMsg: Message = { role: "user", text: input };
-    setMessages((prev) => [...prev, newMsg]);
+    setInput("");
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: input, userId: 1 }),
-      });
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: input, userId: 1 }),
+    });
+    const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`);
-      }
-
-      const data: { answer?: string; error?: string } = await res.json();
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "bot", text: data.answer ?? "Sorry, something went wrong." },
-      ]);
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "bot", text: "⚠️ Failed to fetch response. Please try again." },
-      ]);
-    } finally {
-      setInput("");
-    }
-  }
-
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>): void {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendMessage();
-    }
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", text: data.data.answer },
+    ]);
   }
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
-      <h1 className="text-xl font-bold mb-4">Ecommerce Chatbot</h1>
-      <div className="border rounded p-2 h-96 overflow-y-auto bg-white">
-        {messages.map((m, i) => (
-          <div
+    <div className="flex flex-col h-screen bg-gradient-to-b from-gray-100 to-white">
+      <header className="p-4 bg-blue-600 text-white text-lg font-semibold shadow-md">
+        💬 Ecommerce Chatbot
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg, i) => (
+          <motion.div
             key={i}
-            className={`my-1 ${m.role === "user" ? "text-right" : "text-left"}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`max-w-xs p-3 rounded-2xl shadow ${
+              msg.role === "user"
+                ? "bg-blue-500 text-white self-end ml-auto"
+                : "bg-gray-200 text-gray-800 self-start"
+            }`}
           >
-            <p
-              className={`inline-block px-3 py-2 rounded-lg shadow-sm ${
-                m.role === "user"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-900"
-              }`}
-            >
-              {m.text}
-            </p>
-          </div>
+            {msg.text}
+          </motion.div>
         ))}
       </div>
-      <div className="flex mt-2">
+
+      <div className="p-4 bg-white border-t flex gap-2">
         <input
-          className="flex-1 border rounded p-2"
+          className="flex-1 border rounded-xl px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Type your message…"
           value={input}
-          placeholder="Type your message..."
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
         />
         <button
           onClick={sendMessage}
-          className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+          className="bg-blue-600 text-white px-4 rounded-xl shadow hover:bg-blue-700"
         >
-          Send
+          <Send size={20} />
         </button>
       </div>
     </div>
