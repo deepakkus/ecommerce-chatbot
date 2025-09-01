@@ -10,11 +10,7 @@ let db: mysql.Pool | null = null;
 
 async function getDB() {
   if (!db) {
-    db = mysql.createPool({
-      uri: process.env.DATABASE_URL as string, // ✅ works for Vercel MySQL
-      waitForConnections: true,
-      connectionLimit: 10,
-    } as any); // cast because `uri` isn’t in types, but works
+    db = mysql.createPool(process.env.DATABASE_URL!); // ✅ DSN string supported
   }
   return db;
 }
