@@ -55,20 +55,28 @@ export default function ChatPage() {
 
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white self-end ml-auto"
-                  : "bg-gray-100 text-gray-800 self-start"
-              }`}
-            >
-              {msg.text}
-            </motion.div>
-          ))}
+          {messages.map((msg, i) => {
+            // Split assistant messages into smaller sentence chunks
+            const chunks =
+              msg.role === "assistant"
+                ? msg.text.split(/(?<=[.!?])\s+/)
+                : [msg.text];
+
+            return chunks.map((chunk, j) => (
+              <motion.div
+                key={`${i}-${j}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm whitespace-pre-line ${
+                  msg.role === "user"
+                    ? "bg-blue-600 text-white self-end ml-auto"
+                    : "bg-gray-100 text-gray-800 self-start"
+                }`}
+              >
+                {chunk}
+              </motion.div>
+            ));
+          })}
 
           {/* Typing indicator with bouncing dots */}
           {loading && (
